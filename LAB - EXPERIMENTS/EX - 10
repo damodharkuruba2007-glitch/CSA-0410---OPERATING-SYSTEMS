@@ -1,0 +1,81 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <windows.h>
+
+#define BUFFER_SIZE 100
+
+int main()
+{
+    HANDLE hMailslot;
+    HANDLE hClient;
+    char message[BUFFER_SIZE] = "Hello, message queue!";
+    char received[BUFFER_SIZE];
+    DWORD bytesWritten, bytesRead;
+
+    // Create message queue (Mailslot)
+    hMailslot = CreateMailslotA(
+        "\\\\.\\mailslot\\MyMessageQueue",
+        0,
+        MAILSLOT_WAIT_FOREVER,
+        NULL
+    );
+
+    if (hMailslot == INVALID_HANDLE_VALUE)
+    {
+        printf("Message queue creation failed\n");
+        return 1;
+    }
+
+    printf("Message queue created successfully.\n");
+
+    // Producer: Open message queue
+    hClient = CreateFileA(
+        "\\\\.\\mailslot\\MyMessageQueue",
+        GENERIC_WRITE,
+        FILE_SHARE_READ,
+        NULL,
+        OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL,
+        NULL
+    );
+
+    if (hClient == INVALID_HANDLE_VALUE)
+    {
+        printf("Producer connection failed\n");
+        CloseHandle(hMailslot);
+        return 1;
+    }
+
+    // Producer: Send message
+    if (!WriteFile(hClient, message, strlen(message) + 1,
+                   &bytesWritten, NULL))
+    {
+        printf("Message sending failed\n");
+        CloseHandle(hClient);
+        CloseHandle(hMailslot);
+        return 1;
+    }
+
+    printf("Producer: Data sent: %s\n", message);
+
+    CloseHandle(hClient);
+
+    // Consumer: Receive message
+    if (!ReadFile(hMailslot, received, BUFFER_SIZE,
+                  &bytesRead, NULL))
+    {
+        printf("Message receiving failed\n");
+        CloseHandle(hMailslot);
+        return 1;
+    }
+
+    printf("Consumer: Data received: %s\n", received);
+
+    // Remove message queue
+    CloseHandle(hMailslot);
+
+    printf("Message queue removed successfully.\n");
+
+    return 0;
+}
